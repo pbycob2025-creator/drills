@@ -393,26 +393,23 @@
             <button id="restart-btn" class="flex-1 bg-gradient-to-r from-soft-blue to-soft-green text-white font-bold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
                 🔄 Restart Game
             </button>
-            <button id="autoplay-btn" class="flex-1 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-                ⚡ Auto Play
-            </button>
         </div>
     </div>
 
     <!-- Game Board -->
     <div class="relative">
-        <!-- Score Boards Outside -->
-        <div class="absolute -left-24 top-1/2 transform -translate-y-1/2">
-            <div class="text-center bg-white rounded-lg p-3 shadow-lg border border-gray-200">
-                <h3 class="text-sm font-bold text-red-600">🤖 AI</h3>
-                <div class="text-xl font-bold text-red-600" id="player2-score">0</div>
+        <!-- Score Boards Below Stores -->
+        <div class="absolute left-2 top-40">
+            <div class="text-center bg-white rounded-lg p-2 shadow-lg border border-gray-200">
+                <h3 class="text-xs font-bold text-red-600">🤖 AI</h3>
+                <div class="text-lg font-bold text-red-600" id="player2-score">0</div>
             </div>
         </div>
         
-        <div class="absolute -right-24 top-1/2 transform -translate-y-1/2">
-            <div class="text-center bg-white rounded-lg p-3 shadow-lg border border-gray-200">
-                <h3 class="text-sm font-bold text-blue-600">😊 You</h3>
-                <div class="text-xl font-bold text-blue-600" id="player1-score">0</div>
+        <div class="absolute right-2 top-40">
+            <div class="text-center bg-white rounded-lg p-2 shadow-lg border border-gray-200">
+                <h3 class="text-xs font-bold text-blue-600">😊 You</h3>
+                <div class="text-lg font-bold text-blue-600" id="player1-score">0</div>
             </div>
         </div>
         
@@ -562,8 +559,7 @@
             <div id="popup-title" class="popup-title">🎉 You Win!</div>
             <div id="popup-score" class="popup-score">Your Score: 24 - AI Score: 24</div>
             <div class="popup-buttons">
-                <button id="play-again-btn" class="popup-btn play-again-btn">🎮 다시 하기</button>
-                <button id="share-btn" class="popup-btn share-btn">📤 공유하기</button>
+                <button id="play-again-btn" class="popup-btn play-again-btn">🔄 RETRY</button>
             </div>
         </div>
     </div>

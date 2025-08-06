@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mancala Game - 만칼라 게임</title>
+    <title>Mancala Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -393,26 +393,23 @@
             <button id="restart-btn" class="flex-1 bg-gradient-to-r from-soft-blue to-soft-green text-white font-bold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
                 🔄 Restart Game
             </button>
-            <button id="autoplay-btn" class="flex-1 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-                ⚡ Auto Play
-            </button>
         </div>
     </div>
 
     <!-- Game Board -->
     <div class="relative">
-        <!-- Score Boards Outside -->
-        <div class="absolute -left-24 top-1/2 transform -translate-y-1/2">
-            <div class="text-center bg-white rounded-lg p-3 shadow-lg border border-gray-200">
-                <h3 class="text-sm font-bold text-red-600">🤖 AI</h3>
-                <div class="text-xl font-bold text-red-600" id="player2-score">0</div>
+        <!-- Score Boards Below Stores -->
+        <div class="absolute left-2 top-40">
+            <div class="text-center bg-white rounded-lg p-2 shadow-lg border border-gray-200">
+                <h3 class="text-xs font-bold text-red-600">🤖 AI</h3>
+                <div class="text-lg font-bold text-red-600" id="player2-score">0</div>
             </div>
         </div>
         
-        <div class="absolute -right-24 top-1/2 transform -translate-y-1/2">
-            <div class="text-center bg-white rounded-lg p-3 shadow-lg border border-gray-200">
-                <h3 class="text-sm font-bold text-blue-600">😊 You</h3>
-                <div class="text-xl font-bold text-blue-600" id="player1-score">0</div>
+        <div class="absolute right-2 top-40">
+            <div class="text-center bg-white rounded-lg p-2 shadow-lg border border-gray-200">
+                <h3 class="text-xs font-bold text-blue-600">😊 You</h3>
+                <div class="text-lg font-bold text-blue-600" id="player1-score">0</div>
             </div>
         </div>
         
@@ -562,8 +559,7 @@
             <div id="popup-title" class="popup-title">🎉 You Win!</div>
             <div id="popup-score" class="popup-score">Your Score: 24 - AI Score: 24</div>
             <div class="popup-buttons">
-                <button id="play-again-btn" class="popup-btn play-again-btn">🎮 다시 하기</button>
-                <button id="share-btn" class="popup-btn share-btn">📤 공유하기</button>
+                <button id="play-again-btn" class="popup-btn play-again-btn">🔄 RETRY</button>
             </div>
         </div>
     </div>
@@ -575,8 +571,6 @@
                 this.board = [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0];
                 this.currentPlayer = 1; // 1 or 2
                 this.gameOver = false;
-                this.autoPlay = false;
-                this.autoPlaySpeed = 200; // 빠른 속도 (200ms)
                 
                 // DOM elements
                 this.pits = document.querySelectorAll('.pit');
@@ -585,7 +579,6 @@
                 this.player1Score = document.getElementById('player1-score');
                 this.player2Score = document.getElementById('player2-score');
                 this.restartBtn = document.getElementById('restart-btn');
-                this.autoPlayBtn = document.getElementById('autoplay-btn');
                 this.toast = document.getElementById('toast');
                 this.toastMessage = document.getElementById('toast-message');
                 
@@ -594,7 +587,6 @@
                 this.popupTitle = document.getElementById('popup-title');
                 this.popupScore = document.getElementById('popup-score');
                 this.playAgainBtn = document.getElementById('play-again-btn');
-                this.shareBtn = document.getElementById('share-btn');
                 
                 this.initializeGame();
                 this.attachEventListeners();
@@ -616,80 +608,22 @@
                 // Restart button
                 this.restartBtn.addEventListener('click', () => this.restartGame());
                 
-                // Auto play button
-                this.autoPlayBtn.addEventListener('click', () => this.toggleAutoPlay());
-                
                 // Popup buttons
                 this.playAgainBtn.addEventListener('click', () => this.restartGame());
-                this.shareBtn.addEventListener('click', () => this.shareGame());
             }
             
             handlePitClick(e) {
-                if (this.gameOver || (this.currentPlayer === 2 && !this.autoPlay)) return;
-                if (this.autoPlay) return; // 오토플레이 중에는 클릭 무시
+                if (this.gameOver || this.currentPlayer === 2) return;
                 
                 const pitIndex = parseInt(e.currentTarget.dataset.pit);
                 const pitPlayer = parseInt(e.currentTarget.dataset.player);
                 
-                // Only allow Player 1 (human) moves when not in auto play
+                // Only allow Player 1 (human) moves
                 if (pitPlayer !== 1 || this.board[pitIndex] === 0) {
                     return;
                 }
                 
                 this.makeMove(pitIndex);
-            }
-            
-            toggleAutoPlay() {
-                this.autoPlay = !this.autoPlay;
-                
-                if (this.autoPlay) {
-                    this.autoPlayBtn.textContent = "⏸️ Stop Auto";
-                    this.autoPlayBtn.className = "flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105";
-                    this.startAutoPlay();
-                } else {
-                    this.autoPlayBtn.textContent = "⚡ Auto Play";
-                    this.autoPlayBtn.className = "flex-1 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105";
-                }
-            }
-            
-            startAutoPlay() {
-                if (!this.autoPlay || this.gameOver) return;
-                
-                setTimeout(() => {
-                    this.makeAutoMove();
-                }, this.autoPlaySpeed);
-            }
-            
-            makeAutoMove() {
-                if (!this.autoPlay || this.gameOver) return;
-                
-                // Get available moves for current player
-                let availablePits = [];
-                if (this.currentPlayer === 1) {
-                    // Player 1 pits (0-5)
-                    for (let i = 0; i <= 5; i++) {
-                        if (this.board[i] > 0) {
-                            availablePits.push(i);
-                        }
-                    }
-                } else {
-                    // Player 2 pits (7-12)
-                    for (let i = 7; i <= 12; i++) {
-                        if (this.board[i] > 0) {
-                            availablePits.push(i);
-                        }
-                    }
-                }
-                
-                if (availablePits.length > 0) {
-                    // 랜덤하게 또는 전략적으로 선택 (여기서는 랜덤)
-                    const randomIndex = Math.floor(Math.random() * availablePits.length);
-                    const selectedPit = availablePits[randomIndex];
-                    this.makeMove(selectedPit);
-                } else {
-                    // 더 이상 움직일 수 없으면 오토플레이 중지
-                    this.toggleAutoPlay();
-                }
             }
             
             makeMove(pitIndex) {
@@ -745,9 +679,7 @@
                     this.updateScores();
                     
                     if (extraTurn) {
-                        // 오토플레이 모드에서는 더 빠르게 표시
-                        const duration = this.autoPlay ? 800 : 2000;
-                        this.showPlayerMessage("한번 더! 🎉", this.currentPlayer, duration);
+                        this.showPlayerMessage("한번 더! 🎉", this.currentPlayer, 2000);
                     } else {
                         this.switchPlayer();
                     }
@@ -761,13 +693,9 @@
                     this.updateTurnIndicator();
                     this.updatePitAvailability();
                     
-                    // If it's now AI's turn or auto play is on, continue
-                    if ((this.currentPlayer === 2 && !this.gameOver) || this.autoPlay) {
-                        if (this.autoPlay) {
-                            this.startAutoPlay();
-                        } else {
-                            this.makeAIMove();
-                        }
+                    // If it's now AI's turn, continue
+                    if (this.currentPlayer === 2 && !this.gameOver) {
+                        this.makeAIMove();
                     }
                 });
             }
@@ -1364,43 +1292,14 @@
                 this.gameOverPopup.classList.remove('show');
             }
             
-            shareGame() {
-                const player1Score = this.board[6];
-                const player2Score = this.board[13];
-                const result = player1Score > player2Score ? "승리" : 
-                             player2Score > player1Score ? "패배" : "무승부";
-                
-                const text = `만칼라 게임 결과: ${result}! 내 점수: ${player1Score}, AI 점수: ${player2Score} 🎮`;
-                
-                if (navigator.share) {
-                    navigator.share({
-                        title: '만칼라 게임 결과',
-                        text: text,
-                        url: window.location.href
-                    });
-                } else {
-                    // Fallback - copy to clipboard
-                    navigator.clipboard.writeText(text + ' ' + window.location.href).then(() => {
-                        this.showToast("결과가 복사되었습니다! 📋");
-                    });
-                }
-            }
-            
             restartGame() {
                 this.board = [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0];
                 this.currentPlayer = 1;
                 this.gameOver = false;
                 
-                // 오토플레이가 켜져있으면 그대로 유지
-                
                 this.hideGameOverPopup();
                 this.initializeGame();
                 this.showToast("New game started! 🎮");
-                
-                // 오토플레이가 켜져있다면 바로 시작
-                if (this.autoPlay) {
-                    this.startAutoPlay();
-                }
             }
         }
         
