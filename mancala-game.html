@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mancala Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'soft-blue': '#a7c9d9',
+                        'soft-green': '#b8d4a8',
+                        'soft-brown': '#d4b896',
+                        'mancala-bg': '#f0f4f8',
+                        'board-wood': '#8b4513',
+                        'board-light': '#deb887'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.8); }
+        }
+        
+        @keyframes stone-move {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        
+        .bounce-animation {
+            animation: bounce 0.5s ease-in-out;
+        }
+        
+        .glow-effect {
+            animation: glow 2s infinite;
+        }
+        
+        .stone-animate {
+            animation: stone-move 0.3s ease-in-out;
+        }
+        
+        .pit {
+            transition: all 0.3s ease;
+        }
+        
+        .pit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .pit.disabled {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        
+        .stone {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 1px;
+            transition: all 0.2s ease;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: inset 2px 2px 4px rgba(255, 255, 255, 0.3), 
+                        inset -2px -2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .stone-pile {
+            position: relative;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            min-height: 30px;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .stone-pile .stone {
+            position: absolute;
+        }
+        
+        .stones-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .stone.size-small, 
+        .stone.size-normal, 
+        .stone.size-large { 
+            width: 14px; 
+            height: 14px; 
+        }
+        
+        .stone.rotate-slight { 
+            transform: rotate(15deg); 
+        }
+        
+        .stone.rotate-more { 
+            transform: rotate(-20deg); 
+        }
+        
+        .stone.rotate-normal { 
+            transform: rotate(0deg); 
+        }
+        
+        .stone-moving {
+            position: fixed;
+            z-index: 1000;
+            animation: stone-move-path 0.5s ease-in-out;
+            pointer-events: none;
+        }
+        
+        @keyframes stone-drop {
+            0% { 
+                transform: scale(1.5) translateY(-30px); 
+                opacity: 1;
+            }
+            20% { 
+                transform: scale(1.3) translateY(-20px); 
+                opacity: 1;
+            }
+            60% { 
+                transform: scale(1.1) translateY(-5px); 
+                opacity: 1;
+            }
+            80% { 
+                transform: scale(1.05) translateY(2px); 
+                opacity: 1;
+            }
+            100% { 
+                transform: scale(1) translateY(0); 
+                opacity: 0;
+            }
+        }
+        
+        @keyframes stone-fly {
+            0% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+            25% {
+                transform: scale(1.4) translateY(-15px);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.3) translateY(-10px);
+                opacity: 1;
+            }
+            75% {
+                transform: scale(1.1) translateY(-3px);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1) translateY(0);
+                opacity: 0;
+            }
+        }
+        
+        .pit-highlight {
+            animation: pit-glow 0.3s ease-in-out;
+        }
+        
+        @keyframes pit-glow {
+            0% { 
+                box-shadow: 0 0 0 rgba(59, 130, 246, 0);
+                transform: scale(1);
+            }
+            50% { 
+                box-shadow: 0 0 25px rgba(59, 130, 246, 1);
+                transform: scale(1.05);
+            }
+            100% { 
+                box-shadow: 0 0 0 rgba(59, 130, 246, 0);
+                transform: scale(1);
+            }
+        }
+        
+        .stone-trail {
+            position: fixed;
+            pointer-events: none;
+            z-index: 999;
+        }
+        
+        @keyframes trail-fade {
+            0% { opacity: 0.8; transform: scale(0.8); }
+            100% { opacity: 0; transform: scale(0.3); }
+        }
+        
+        .hand-grab {
+            position: fixed;
+            font-size: 32px;
+            z-index: 1500;
+            pointer-events: none;
+            animation: hand-grab-action 1.5s ease-out forwards;
+        }
+        
+        @keyframes hand-grab-action {
+            0% { 
+                transform: scale(0) rotate(-30deg);
+                opacity: 0;
+            }
+            20% { 
+                transform: scale(1.2) rotate(-10deg);
+                opacity: 1;
+            }
+            40% { 
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+            60% { 
+                transform: scale(1.1) rotate(5deg);
+                opacity: 1;
+            }
+            80% { 
+                transform: scale(0.9) rotate(-5deg);
+                opacity: 0.8;
+            }
+            100% { 
+                transform: scale(0.8) rotate(0deg);
+                opacity: 0;
+            }
+        }
+        
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .toast.show {
+            transform: translate(-50%, -50%) scale(1);
+        }
+        
+        /* 구슬 개수 표시를 항상 맨 앞에 */
+        .pit > div:last-child,
+        .store > div:last-child {
+            z-index: 1010 !important;
+        }
+        
+        .stone-count,
+        .store-count {
+            z-index: 1010 !important;
+        }
+        
+        /* 게임 종료 팝업 */
+        .game-over-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
+        .game-over-popup.show {
+            display: flex;
+        }
+        
+        .popup-content {
+            background: linear-gradient(to br, #8b4513, #deb887);
+            border-radius: 30px;
+            padding: 24px;
+            width: 416px;
+            height: 180px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            border: 4px solid #d4b896;
+        }
+        
+        .popup-title {
+            font-size: 2rem;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            margin-bottom: 8px;
+        }
+        
+        .popup-score {
+            font-size: 1.2rem;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+            margin-bottom: 16px;
+        }
+        
+        .popup-buttons {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .popup-btn {
+            background: white;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            font-size: 14px;
+        }
+        
+        .popup-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .play-again-btn {
+            background: linear-gradient(to r, #4ade80, #22c55e) !important;
+            color: white !important;
+        }
+        
+        .share-btn {
+            background: linear-gradient(to r, #3b82f6, #1d4ed8) !important;
+            color: white !important;
+        }
+        
+        /* 플레이어별 위치 메시지 */
+        .player-message {
+            position: fixed;
+            padding: 12px 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            z-index: 1500;
+            transform: scale(0);
+            transition: all 0.3s ease;
+            border: 3px solid;
+        }
+        
+        .player-message.player1 {
+            top: 50%;
+            right: 10px;
+            margin-top: -50px;
+            color: #2563eb;
+            border-color: #2563eb;
+        }
+        
+        .player-message.player2 {
+            top: 50%;
+            left: 10px;
+            margin-top: -50px;
+            color: #dc2626;
+            border-color: #dc2626;
+        }
+        
+        .player-message.player1.show {
+            transform: scale(1);
+        }
+        
+        .player-message.player2.show {
+            transform: scale(1);
+        }
+    </style>
+</head>
+<body class="bg-mancala-bg min-h-screen flex flex-col items-center justify-center p-4">
+    <!-- Game Header -->
+    <div class="w-full max-w-lg mb-6">
+        <div class="text-center mb-4">
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Mancala</h1>
+            <div class="text-sm font-medium text-gray-600" id="turn-indicator">Your Turn</div>
+        </div>
+        
+        <div class="flex gap-2">
+            <button id="restart-btn" class="flex-1 bg-gradient-to-r from-soft-blue to-soft-green text-white font-bold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+                🔄 Restart Game
+            </button>
+            <button id="autoplay-btn" class="flex-1 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+                ⚡ Auto Play
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Board -->
+    <div class="relative">
+        <!-- Score Boards Outside -->
+        <div class="absolute -left-24 top-1/2 transform -translate-y-1/2">
+            <div class="text-center bg-white rounded-lg p-3 shadow-lg border border-gray-200">
+                <h3 class="text-sm font-bold text-red-600">🤖 AI</h3>
+                <div class="text-xl font-bold text-red-600" id="player2-score">0</div>
+            </div>
+        </div>
+        
+        <div class="absolute -right-24 top-1/2 transform -translate-y-1/2">
+            <div class="text-center bg-white rounded-lg p-3 shadow-lg border border-gray-200">
+                <h3 class="text-sm font-bold text-blue-600">😊 You</h3>
+                <div class="text-xl font-bold text-blue-600" id="player1-score">0</div>
+            </div>
+        </div>
+        
+        <!-- Board Container -->
+        <div class="bg-gradient-to-br from-board-wood to-board-light rounded-full shadow-2xl p-6 relative" style="width: 416px; height: 180px;">
+            
+            <!-- Player 2 Pits (Top Row) -->
+            <div class="absolute top-4 left-20 right-20 flex justify-between">
+                <div class="pit bg-amber-100 border-4 border-amber-200 rounded-full w-14 h-14 flex flex-col items-center justify-center cursor-pointer shadow-inner relative" data-pit="12" data-player="2">
+                    <div class="stones-container flex-1 flex items-center justify-center"></div>
+                    <div class="absolute -bottom-1 right-0 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-300">
+                        <span class="stone-count text-xs font-bold text-gray-700">4</span>
+                    </div>
+                </div>
+                <div class="pit bg-amber-100 border-4 border-amber-200 rounded-full w-14 h-14 flex flex-col items-center justify-center cursor-pointer shadow-inner relative" data-pit="11" data-player="2">
+                    <div class="stones-container flex-1 flex items-center justify-center"></div>
+                    <div class="absolute -bottom-1 right-0 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-300">
+                        <span class="stone-count text-xs font-bold text-gray-700">4</span>
+                    </div>
+                </div>
+                <div class="pit bg-amber-100 border-4 border-amber-200 rounded-full w-14 h-14 flex flex-col items-center justify-center cursor-pointer shadow-inner relative" data-pit="10" data-player="2">
+                    <div class="stones-container flex-1 flex items-center justify-center"></div>
+                    <div class="absolute -bottom-1 right-0 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-300">
+                        <span class="stone-count text-xs font-bold text-gray-700">4</span>
+                    </div>
+                </div>
+                <div class="pit bg-amber-100 border-4 border-amber-200 rounded-full w-14 h-14 flex flex-col items-center justify-center cursor-pointer shadow-inner relative" data-pit="9" data-player="2">
+                    <div class="stones-container flex-1 flex items-center justify-center"></div>
+                    <div class="absolute -bottom-1 right-0 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-300">
+                        <span class="stone-count text-xs font-bold text-gray-700">4</span>
+                    </div>
+                </div>
+                <div class="pit bg-amber-100 border-4 border-amber-200 rounded-full w-14 h-14 flex flex-col items-center justify-center cursor-pointer shadow-inner relative" data-pit="8" data-player="2">
+                    <div class="stones-container flex-1 flex items-center justify-center"></div>
+                    <div class="absolute -bottom-1 right-0 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-300">
+                        <span class="stone-count text-xs font-bold text-gray-700">4</span>
+                    </div>
+                </div>
+                <div class="pit bg-amber-100 border-4 border-amber-200 rounded-full w-14 h-14 flex flex-col items-center justify-center cursor-pointer shadow-inner relative" data-pit="7" data-player="2">
+                    <div class="stones-container flex-1 flex items-center justify-center"></div>
+                    <div class="absolute -bottom-1 right-0 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-300">
+                        <span class="stone-count text-xs font-bold text-gray-700">4</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player 1 Store (Right) -->
+            <div class="absolute right-2 top-8 bottom-8 flex items-center">
+                <div class="store bg-blue-200 border-4 border-blue-300 rounded-full w-16 h-20 flex flex-col items-center justify-center shadow-inner relative" data-store="1">
+                    <div class="stones-container flex-1 flex items-center justify-center"></div>
+                    <div class="absolute -bottom-1 -right-1 bg-white rounded-full w-6 h-6 flex items-center justify-center shadow-md border border-gray-300">
+                        <span class="store-count text-sm font-bold text-gray-700">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player 2 Store (Left) -->
+            <div class="absolute left-2 top-8 bottom-8 flex items-center">
+                <div class="store bg-red-200 border-4 border-red-300 rounded-full w-16 h-20 flex flex-col items-center justify-center shadow-inner relative" data-store="2">
+                    <div class="stones-container flex-1 flex items-center justify-center"></div>
+                    <div class="absolute -bottom-1 -left-1 bg-white rounded-full w-6 h-6 flex items-center justify-center shadow-md border border-gray-300">
+                        <span class="store-count text-sm font-bold text-gray-700">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player 1 Pits (Bottom Row) -->
+            <div class="absolute bottom-4 left-20 right-20 flex justify-between">
+                <div class="pit bg-green-100 border-4 border-green-200 rounded-full w-14 h-14 flex flex-col items-center justify-center cursor-pointer shadow-inner glow-effect relative" data-pit="0" data-player="1">
+                    <div class="stones-container flex-1 flex items-center justify-center"></div>
+                    <div class="absolute -bottom-1 right-0 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-300">
+                        <span class="stone-count text-xs font-bold text-gray-700">4</span>
+                    </div>
+                </div>
+                <div class="pit bg-green-100 border-4 border-green-200 rounded-full w-14 h-14 flex flex-col items-center justify-center cursor-pointer shadow-inner relative" data-pit="1" data-player="1">
+                    <div class="stones-container flex-1 flex items-center justify-center"></div>
+                    <div class="absolute -bottom-1 right-0 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-300">
+                        <span class="stone-count text-xs font-bold text-gray-700">4</span>
+                    </div>
+                </div>
+                <div class="pit bg-green-100 border-4 border-green-200 rounded-full w-14 h-14 flex flex-col items-center justify-center cursor-pointer shadow-inner relative" data-pit="2" data-player="1">
+                    <div class="stones-container flex-1 flex items-center justify-center"></div>
+                    <div class="absolute -bottom-1 right-0 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-300">
+                        <span class="stone-count text-xs font-bold text-gray-700">4</span>
+                    </div>
+                </div>
+                <div class="pit bg-green-100 border-4 border-green-200 rounded-full w-14 h-14 flex flex-col items-center justify-center cursor-pointer shadow-inner relative" data-pit="3" data-player="1">
+                    <div class="stones-container flex-1 flex items-center justify-center"></div>
+                    <div class="absolute -bottom-1 right-0 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-300">
+                        <span class="stone-count text-xs font-bold text-gray-700">4</span>
+                    </div>
+                </div>
+                <div class="pit bg-green-100 border-4 border-green-200 rounded-full w-14 h-14 flex flex-col items-center justify-center cursor-pointer shadow-inner relative" data-pit="4" data-player="1">
+                    <div class="stones-container flex-1 flex items-center justify-center"></div>
+                    <div class="absolute -bottom-1 right-0 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-300">
+                        <span class="stone-count text-xs font-bold text-gray-700">4</span>
+                    </div>
+                </div>
+                <div class="pit bg-green-100 border-4 border-green-200 rounded-full w-14 h-14 flex flex-col items-center justify-center cursor-pointer shadow-inner relative" data-pit="5" data-player="1">
+                    <div class="stones-container flex-1 flex items-center justify-center"></div>
+                    <div class="absolute -bottom-1 right-0 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-300">
+                        <span class="stone-count text-xs font-bold text-gray-700">4</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Rules -->
+    <div class="w-full max-w-lg mt-6 bg-gradient-to-r from-blue-50 to-green-50 rounded-xl p-4 shadow-lg border border-gray-200">
+        <h3 class="text-lg font-bold text-gray-800 mb-3 text-center">🎯 만칼라 게임 규칙</h3>
+        <div class="space-y-2 text-sm text-gray-700">
+            <div class="flex items-start space-x-2">
+                <span class="text-blue-500 font-bold">1️⃣</span>
+                <p><strong>목표:</strong> 자신의 저장소(큰 홈)에 더 많은 구슬을 모으기</p>
+            </div>
+            <div class="flex items-start space-x-2">
+                <span class="text-green-500 font-bold">2️⃣</span>
+                <p><strong>순서:</strong> 자신의 홈(아래쪽 6개) 중 하나를 선택해 구슬을 집어들기</p>
+            </div>
+            <div class="flex items-start space-x-2">
+                <span class="text-yellow-500 font-bold">3️⃣</span>
+                <p><strong>분배:</strong> 구슬을 하나씩 시계 반대 방향으로 다음 홈들에 넣기</p>
+            </div>
+            <div class="flex items-start space-x-2">
+                <span class="text-purple-500 font-bold">4️⃣</span>
+                <p><strong>보너스:</strong> 마지막 구슬이 자신의 저장소에 들어가면 <em>한 번 더!</em></p>
+            </div>
+            <div class="flex items-start space-x-2">
+                <span class="text-red-500 font-bold">5️⃣</span>
+                <p><strong>종료:</strong> 한쪽의 모든 홈이 비면 게임 끝! 더 많은 구슬을 모은 쪽이 승리 🏆</p>
+            </div>
+        </div>
+        <div class="mt-3 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+            <p class="text-xs text-yellow-700 text-center">💡 <em>상대방은 AI가 자동으로 플레이합니다</em></p>
+        </div>
+    </div>
+
+    <!-- Toast Messages -->
+    <div id="toast" class="toast bg-white border-2 border-gray-300 rounded-lg p-4 shadow-lg">
+        <div id="toast-message" class="text-center font-bold"></div>
+    </div>
+
+    <!-- Game Over Popup -->
+    <div id="game-over-popup" class="game-over-popup">
+        <div class="popup-content">
+            <div id="popup-title" class="popup-title">🎉 You Win!</div>
+            <div id="popup-score" class="popup-score">Your Score: 24 - AI Score: 24</div>
+            <div class="popup-buttons">
+                <button id="play-again-btn" class="popup-btn play-again-btn">🎮 다시 하기</button>
+                <button id="share-btn" class="popup-btn share-btn">📤 공유하기</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class MancalaGame {
+            constructor() {
+                // Game state initialization
+                this.board = [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0];
+                this.currentPlayer = 1; // 1 or 2
+                this.gameOver = false;
+                this.autoPlay = false;
+                this.autoPlaySpeed = 200; // 빠른 속도 (200ms)
+                
+                // DOM elements
+                this.pits = document.querySelectorAll('.pit');
+                this.stores = document.querySelectorAll('.store');
+                this.turnIndicator = document.getElementById('turn-indicator');
+                this.player1Score = document.getElementById('player1-score');
+                this.player2Score = document.getElementById('player2-score');
+                this.restartBtn = document.getElementById('restart-btn');
+                this.autoPlayBtn = document.getElementById('autoplay-btn');
+                this.toast = document.getElementById('toast');
+                this.toastMessage = document.getElementById('toast-message');
+                
+                // Popup elements
+                this.gameOverPopup = document.getElementById('game-over-popup');
+                this.popupTitle = document.getElementById('popup-title');
+                this.popupScore = document.getElementById('popup-score');
+                this.playAgainBtn = document.getElementById('play-again-btn');
+                this.shareBtn = document.getElementById('share-btn');
+                
+                this.initializeGame();
+                this.attachEventListeners();
+            }
+            
+            initializeGame() {
+                this.updateVisualBoard();
+                this.updateTurnIndicator();
+                this.updateScores();
+                this.updatePitAvailability();
+            }
+            
+            attachEventListeners() {
+                // Pit click events
+                this.pits.forEach(pit => {
+                    pit.addEventListener('click', (e) => this.handlePitClick(e));
+                });
+                
+                // Restart button
+                this.restartBtn.addEventListener('click', () => this.restartGame());
+                
+                // Auto play button
+                this.autoPlayBtn.addEventListener('click', () => this.toggleAutoPlay());
+                
+                // Popup buttons
+                this.playAgainBtn.addEventListener('click', () => this.restartGame());
+                this.shareBtn.addEventListener('click', () => this.shareGame());
+            }
+            
+            handlePitClick(e) {
+                if (this.gameOver || (this.currentPlayer === 2 && !this.autoPlay)) return;
+                if (this.autoPlay) return; // 오토플레이 중에는 클릭 무시
+                
+                const pitIndex = parseInt(e.currentTarget.dataset.pit);
+                const pitPlayer = parseInt(e.currentTarget.dataset.player);
+                
+                // Only allow Player 1 (human) moves when not in auto play
+                if (pitPlayer !== 1 || this.board[pitIndex] === 0) {
+                    return;
+                }
+                
+                this.makeMove(pitIndex);
+            }
+            
+            toggleAutoPlay() {
+                this.autoPlay = !this.autoPlay;
+                
+                if (this.autoPlay) {
+                    this.autoPlayBtn.textContent = "⏸️ Stop Auto";
+                    this.autoPlayBtn.className = "flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105";
+                    this.startAutoPlay();
+                } else {
+                    this.autoPlayBtn.textContent = "⚡ Auto Play";
+                    this.autoPlayBtn.className = "flex-1 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105";
+                }
+            }
+            
+            startAutoPlay() {
+                if (!this.autoPlay || this.gameOver) return;
+                
+                setTimeout(() => {
+                    this.makeAutoMove();
+                }, this.autoPlaySpeed);
+            }
+            
+            makeAutoMove() {
+                if (!this.autoPlay || this.gameOver) return;
+                
+                // Get available moves for current player
+                let availablePits = [];
+                if (this.currentPlayer === 1) {
+                    // Player 1 pits (0-5)
+                    for (let i = 0; i <= 5; i++) {
+                        if (this.board[i] > 0) {
+                            availablePits.push(i);
+                        }
+                    }
+                } else {
+                    // Player 2 pits (7-12)
+                    for (let i = 7; i <= 12; i++) {
+                        if (this.board[i] > 0) {
+                            availablePits.push(i);
+                        }
+                    }
+                }
+                
+                if (availablePits.length > 0) {
+                    // 랜덤하게 또는 전략적으로 선택 (여기서는 랜덤)
+                    const randomIndex = Math.floor(Math.random() * availablePits.length);
+                    const selectedPit = availablePits[randomIndex];
+                    this.makeMove(selectedPit);
+                } else {
+                    // 더 이상 움직일 수 없으면 오토플레이 중지
+                    this.toggleAutoPlay();
+                }
+            }
+            
+            makeMove(pitIndex) {
+                const stones = this.board[pitIndex];
+                this.board[pitIndex] = 0;
+                
+                // Show hand grabbing animation
+                this.showHandGrabbing(pitIndex);
+                
+                // Update the starting pit immediately to show it's empty
+                this.updateSingleContainer(pitIndex);
+                
+                // Start animated stone distribution after hand grab delay
+                setTimeout(() => {
+                    this.animateStoneDistribution(pitIndex, stones);
+                }, 300);
+            }
+            
+            animateStoneDistribution(startPit, stones) {
+                let currentIndex = startPit;
+                let stonesLeft = stones;
+                let distributionPath = [];
+                
+                // Calculate distribution path
+                while (stonesLeft > 0) {
+                    currentIndex = (currentIndex + 1) % 14;
+                    
+                    // Skip opponent's store
+                    if ((this.currentPlayer === 1 && currentIndex === 13) || 
+                        (this.currentPlayer === 2 && currentIndex === 6)) {
+                        continue;
+                    }
+                    
+                    distributionPath.push(currentIndex);
+                    stonesLeft--;
+                }
+                
+                // Store the starting pit for animation reference
+                this.animationStartPit = startPit;
+                
+                // Animate stones one by one
+                this.animateStoneSequence(distributionPath, 0, () => {
+                    // Animation complete - finish move
+                    const lastIndex = distributionPath[distributionPath.length - 1];
+                    
+                    // Capture feature removed
+                    
+                    // Check for extra turn (landed in own store)
+                    const extraTurn = this.checkExtraTurn(lastIndex);
+                    
+                    // Update visual board
+                    this.updateVisualBoard();
+                    this.updateScores();
+                    
+                    if (extraTurn) {
+                        // 오토플레이 모드에서는 더 빠르게 표시
+                        const duration = this.autoPlay ? 800 : 2000;
+                        this.showPlayerMessage("한번 더! 🎉", this.currentPlayer, duration);
+                    } else {
+                        this.switchPlayer();
+                    }
+                    
+                    // Check for game over
+                    if (this.checkGameOver()) {
+                        this.endGame();
+                        return;
+                    }
+                    
+                    this.updateTurnIndicator();
+                    this.updatePitAvailability();
+                    
+                    // If it's now AI's turn or auto play is on, continue
+                    if ((this.currentPlayer === 2 && !this.gameOver) || this.autoPlay) {
+                        if (this.autoPlay) {
+                            this.startAutoPlay();
+                        } else {
+                            this.makeAIMove();
+                        }
+                    }
+                });
+            }
+            
+            animateStoneSequence(path, currentStep, onComplete) {
+                if (currentStep >= path.length) {
+                    onComplete();
+                    return;
+                }
+                
+                const targetIndex = path[currentStep];
+                
+                // Add stone to board state
+                this.board[targetIndex]++;
+                
+                // Create visual stone animation
+                this.createMovingStone(targetIndex, () => {
+                    // Update the specific pit/store display
+                    this.updateSingleContainer(targetIndex);
+                    
+                    // Continue with next stone after delay
+                    setTimeout(() => {
+                        this.animateStoneSequence(path, currentStep + 1, onComplete);
+                    }, 250); // 250ms between each stone for faster gameplay
+                });
+            }
+            
+            createMovingStone(targetIndex, onComplete) {
+                // Get source and target elements
+                let sourceElement, targetElement;
+                
+                // Find the most recent source (previous pit in sequence)
+                const isFirstStone = (targetIndex === this.animationStartPit + 1) || 
+                                   (this.animationStartPit === 13 && targetIndex === 0);
+                const prevIndex = this.getPreviousIndex(targetIndex, isFirstStone);
+                if (prevIndex !== -1) {
+                    if (prevIndex === 6 || prevIndex === 13) {
+                        const storePlayer = prevIndex === 6 ? 1 : 2;
+                        sourceElement = document.querySelector(`[data-store="${storePlayer}"]`);
+                    } else {
+                        sourceElement = document.querySelector(`[data-pit="${prevIndex}"]`);
+                    }
+                }
+                
+                if (targetIndex === 6 || targetIndex === 13) {
+                    // Store
+                    const storePlayer = targetIndex === 6 ? 1 : 2;
+                    targetElement = document.querySelector(`[data-store="${storePlayer}"]`);
+                } else {
+                    // Pit
+                    targetElement = document.querySelector(`[data-pit="${targetIndex}"]`);
+                }
+                
+                // Create flying stone
+                const flyingStone = document.createElement('div');
+                flyingStone.className = 'stone stone-moving';
+                flyingStone.style.width = '16px';
+                flyingStone.style.height = '16px';
+                flyingStone.style.zIndex = '1001';
+                
+                // Random color for the stone
+                const colors = ['bg-blue-500', 'bg-green-500', 'bg-red-500', 'bg-yellow-500', 'bg-purple-500'];
+                const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                flyingStone.classList.add(randomColor);
+                
+                document.body.appendChild(flyingStone);
+                
+                // Get positions
+                let startRect;
+                if (sourceElement) {
+                    startRect = sourceElement.getBoundingClientRect();
+                } else {
+                    // Fallback to center of screen
+                    startRect = { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 };
+                }
+                const targetRect = targetElement.getBoundingClientRect();
+                
+                // Position stone at source
+                flyingStone.style.left = (startRect.left + startRect.width / 2 - 8) + 'px';
+                flyingStone.style.top = (startRect.top + startRect.height / 2 - 8) + 'px';
+                
+                // Animate stone to target with direct path
+                setTimeout(() => {
+                    flyingStone.style.transition = 'all 0.3s ease-out';
+                    flyingStone.style.left = (targetRect.left + targetRect.width / 2 - 8) + 'px';
+                    flyingStone.style.top = (targetRect.top + targetRect.height / 2 - 8) + 'px';
+                    flyingStone.style.transform = 'scale(1.2)';
+                }, 10);
+                
+                // Highlight target with more dramatic effect
+                targetElement.classList.add('pit-highlight');
+                
+                // Simple arrival animation
+                setTimeout(() => {
+                    // Remove flying stone
+                    if (document.body.contains(flyingStone)) {
+                        document.body.removeChild(flyingStone);
+                    }
+                    
+                    // Create simple ripple effect
+                    this.createRippleEffect(targetRect);
+                    
+                    // Clean up and complete
+                    setTimeout(() => {
+                        targetElement.classList.remove('pit-highlight');
+                        onComplete();
+                    }, 200);
+                    
+                }, 300);
+            }
+            
+            getPreviousIndex(currentIndex, isFirstStone = false) {
+                if (isFirstStone && this.animationStartPit !== undefined) {
+                    return this.animationStartPit;
+                }
+                
+                // Calculate the previous index in counter-clockwise direction
+                let prevIndex = (currentIndex - 1 + 14) % 14;
+                
+                // Skip opponent's store based on current player
+                if ((this.currentPlayer === 1 && prevIndex === 13) || 
+                    (this.currentPlayer === 2 && prevIndex === 6)) {
+                    prevIndex = (prevIndex - 1 + 14) % 14;
+                }
+                
+                return prevIndex;
+            }
+            
+            createRippleEffect(rect) {
+                const ripple = document.createElement('div');
+                ripple.style.position = 'fixed';
+                ripple.style.left = (rect.left + rect.width / 2 - 15) + 'px';
+                ripple.style.top = (rect.top + rect.height / 2 - 15) + 'px';
+                ripple.style.width = '30px';
+                ripple.style.height = '30px';
+                ripple.style.borderRadius = '50%';
+                ripple.style.border = '3px solid rgba(59, 130, 246, 0.6)';
+                ripple.style.zIndex = '1000';
+                ripple.style.pointerEvents = 'none';
+                ripple.style.animation = 'trail-fade 0.5s ease-out forwards';
+                
+                document.body.appendChild(ripple);
+                
+                setTimeout(() => {
+                    if (document.body.contains(ripple)) {
+                        document.body.removeChild(ripple);
+                    }
+                }, 500);
+            }
+            
+            showHandGrabbing(pitIndex) {
+                // Get the pit element
+                let pitElement;
+                if (pitIndex === 6 || pitIndex === 13) {
+                    const storePlayer = pitIndex === 6 ? 1 : 2;
+                    pitElement = document.querySelector(`[data-store="${storePlayer}"]`);
+                } else {
+                    pitElement = document.querySelector(`[data-pit="${pitIndex}"]`);
+                }
+                
+                if (!pitElement) return;
+                
+                // Create hand emoji
+                const hand = document.createElement('div');
+                hand.className = 'hand-grab';
+                
+                // Determine emoji based on player
+                let playerEmoji;
+                if (this.currentPlayer === 1) {
+                    // Player 1 - use smiling face
+                    playerEmoji = '😊';
+                } else {
+                    // Player 2 (AI) - use robot emoji
+                    playerEmoji = '🤖';
+                }
+                
+                hand.textContent = playerEmoji;
+                
+                // Position hand over the pit
+                const rect = pitElement.getBoundingClientRect();
+                hand.style.left = (rect.left + rect.width / 2 - 16) + 'px';
+                hand.style.top = (rect.top + rect.height / 2 - 16) + 'px';
+                
+                // Add rotation and positioning based on player
+                if (this.currentPlayer === 2) {
+                    // AI hand appears from top
+                    hand.style.top = (rect.top - 20) + 'px';
+                    hand.style.fontSize = '28px';
+                } else {
+                    // Player hand appears from bottom
+                    hand.style.top = (rect.bottom + 5) + 'px';
+                    hand.style.fontSize = '32px';
+                }
+                
+                document.body.appendChild(hand);
+                
+                // Remove hand after animation
+                setTimeout(() => {
+                    if (document.body.contains(hand)) {
+                        document.body.removeChild(hand);
+                    }
+                }, 1500);
+                
+                // Add special effect to the pit
+                pitElement.classList.add('bounce-animation');
+                setTimeout(() => {
+                    pitElement.classList.remove('bounce-animation');
+                }, 500);
+            }
+            
+            updateSingleContainer(index) {
+                let element, stoneCount;
+                
+                if (index === 6 || index === 13) {
+                    // Store
+                    const storePlayer = index === 6 ? 1 : 2;
+                    element = document.querySelector(`[data-store="${storePlayer}"]`);
+                    stoneCount = this.board[index];
+                } else {
+                    // Pit
+                    element = document.querySelector(`[data-pit="${index}"]`);
+                    stoneCount = this.board[index];
+                }
+                
+                const countElement = element.querySelector('.stone-count, .store-count');
+                const stonesContainer = element.querySelector('.stones-container');
+                
+                countElement.textContent = stoneCount;
+                
+                // Create natural stone pile
+                stonesContainer.innerHTML = '';
+                
+                if (stoneCount === 0) return;
+                
+                // Create pile container
+                const pileContainer = document.createElement('div');
+                pileContainer.className = 'stone-pile';
+                
+                const isStore = (index === 6 || index === 13);
+                const containerWidth = isStore ? 56 : 50;
+                const containerHeight = isStore ? 70 : 50;
+                
+                // Generate natural stone positions
+                const stonePositions = this.generateNaturalStonePositions(stoneCount, containerWidth, containerHeight, isStore);
+                
+                for (let i = 0; i < Math.min(stoneCount, 12); i++) {
+                    const stone = document.createElement('div');
+                    stone.className = 'stone';
+                    
+                    // Random color
+                    const colors = ['bg-blue-500', 'bg-green-500', 'bg-red-500', 'bg-yellow-500', 'bg-purple-500'];
+                    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                    stone.classList.add(randomColor);
+                    
+                    // Add variety in size and rotation
+                    const sizeClasses = ['size-small', 'size-normal', 'size-large'];
+                    const rotateClasses = ['rotate-slight', 'rotate-more', 'rotate-normal'];
+                    
+                    const randomSize = sizeClasses[Math.floor(Math.random() * sizeClasses.length)];
+                    const randomRotate = rotateClasses[Math.floor(Math.random() * rotateClasses.length)];
+                    
+                    stone.classList.add(randomSize, randomRotate);
+                    
+                    // Position stone naturally
+                    const position = stonePositions[i];
+                    stone.style.left = position.x + 'px';
+                    stone.style.top = position.y + 'px';
+                    stone.style.zIndex = position.z;
+                    
+                    // Add slight randomness to rotation only
+                    const additionalRotate = (Math.random() - 0.5) * 30; // -15 to 15 degrees
+                    
+                    stone.style.transform = `rotate(${additionalRotate}deg)`;
+                    
+                    pileContainer.appendChild(stone);
+                }
+                
+                stonesContainer.appendChild(pileContainer);
+            }
+            
+            generateNaturalStonePositions(count, containerWidth, containerHeight, isStore) {
+                const positions = [];
+                const centerX = containerWidth / 2;
+                const centerY = containerHeight / 2;
+                const stoneSize = 14;
+                const spacing = 3; // Minimum spacing between stones
+                
+                if (count === 1) {
+                    // Single stone at center
+                    positions.push({ 
+                        x: centerX - stoneSize/2, 
+                        y: centerY - stoneSize/2, 
+                        z: 1 
+                    });
+                } else if (count <= 4) {
+                    // Arrange in a small cross or square pattern
+                    const arrangements = {
+                        2: [[-6, 0], [6, 0]], // horizontal
+                        3: [[-8, -4], [8, -4], [0, 8]], // triangle
+                        4: [[-6, -6], [6, -6], [-6, 6], [6, 6]] // square
+                    };
+                    
+                    const pattern = arrangements[count];
+                    for (let i = 0; i < count; i++) {
+                        positions.push({
+                            x: centerX + pattern[i][0] - stoneSize/2,
+                            y: centerY + pattern[i][1] - stoneSize/2,
+                            z: 1
+                        });
+                    }
+                } else if (count <= 9) {
+                    // Circular arrangement with center stone
+                    positions.push({ 
+                        x: centerX - stoneSize/2, 
+                        y: centerY - stoneSize/2, 
+                        z: 2 
+                    });
+                    
+                    const radius = isStore ? 12 : 10;
+                    const angleStep = (Math.PI * 2) / (count - 1);
+                    
+                    for (let i = 1; i < count; i++) {
+                        const angle = angleStep * (i - 1);
+                        const x = centerX + Math.cos(angle) * radius - stoneSize/2;
+                        const y = centerY + Math.sin(angle) * radius - stoneSize/2;
+                        
+                        positions.push({ x: x, y: y, z: 1 });
+                    }
+                } else {
+                    // Dense packing for 10+ stones
+                    // Center stone
+                    positions.push({ 
+                        x: centerX - stoneSize/2, 
+                        y: centerY - stoneSize/2, 
+                        z: 3 
+                    });
+                    
+                    // Inner ring
+                    const innerRadius = isStore ? 8 : 7;
+                    const innerStones = Math.min(6, count - 1);
+                    const innerAngleStep = (Math.PI * 2) / innerStones;
+                    
+                    for (let i = 0; i < innerStones; i++) {
+                        const angle = innerAngleStep * i;
+                        const x = centerX + Math.cos(angle) * innerRadius - stoneSize/2;
+                        const y = centerY + Math.sin(angle) * innerRadius - stoneSize/2;
+                        positions.push({ x, y, z: 2 });
+                    }
+                    
+                    // Outer ring for remaining stones
+                    const remainingStones = count - 1 - innerStones;
+                    if (remainingStones > 0) {
+                        const outerRadius = isStore ? 15 : 13;
+                        const outerAngleStep = (Math.PI * 2) / remainingStones;
+                        
+                        for (let i = 0; i < remainingStones; i++) {
+                            const angle = outerAngleStep * i + Math.PI / remainingStones; // Offset for better packing
+                            const x = centerX + Math.cos(angle) * outerRadius - stoneSize/2;
+                            const y = centerY + Math.sin(angle) * outerRadius - stoneSize/2;
+                            
+                            positions.push({ x, y, z: 1 });
+                        }
+                    }
+                }
+                
+                return positions;
+            }
+            
+            // Capture functionality removed
+            
+            checkExtraTurn(lastIndex) {
+                return (this.currentPlayer === 1 && lastIndex === 6) || 
+                       (this.currentPlayer === 2 && lastIndex === 13);
+            }
+            
+            checkGameOver() {
+                // Check if any side is empty
+                const player1Empty = this.board.slice(0, 6).every(stones => stones === 0);
+                const player2Empty = this.board.slice(7, 13).every(stones => stones === 0);
+                
+                return player1Empty || player2Empty;
+            }
+            
+            endGame() {
+                this.gameOver = true;
+                
+                // Move remaining stones to respective stores
+                const player1Remaining = this.board.slice(0, 6).reduce((sum, stones) => sum + stones, 0);
+                const player2Remaining = this.board.slice(7, 13).reduce((sum, stones) => sum + stones, 0);
+                
+                this.board[6] += player1Remaining;
+                this.board[13] += player2Remaining;
+                
+                // Clear pits
+                for (let i = 0; i < 6; i++) this.board[i] = 0;
+                for (let i = 7; i < 13; i++) this.board[i] = 0;
+                
+                this.updateVisualBoard();
+                this.updateScores();
+                
+                // Determine winner
+                const player1Score = this.board[6];
+                const player2Score = this.board[13];
+                
+                let message;
+                if (player1Score > player2Score) {
+                    message = "🎉 You Win!";
+                } else if (player2Score > player1Score) {
+                    message = "🤖 AI Wins!";
+                } else {
+                    message = "🤝 It's a Tie!";
+                }
+                
+                // Show popup instead of toast
+                this.showGameOverPopup(message, player1Score, player2Score);
+                this.turnIndicator.textContent = "Game Over";
+            }
+            
+            switchPlayer() {
+                this.currentPlayer = this.currentPlayer === 1 ? 2 : 1;
+            }
+            
+            updateVisualBoard() {
+                // Update pits
+                this.pits.forEach((pit, index) => {
+                    const pitIndex = parseInt(pit.dataset.pit);
+                    this.updateSingleContainer(pitIndex);
+                });
+                
+                // Update stores
+                this.stores.forEach(store => {
+                    const storePlayer = parseInt(store.dataset.store);
+                    const storeIndex = storePlayer === 1 ? 6 : 13;
+                    this.updateSingleContainer(storeIndex);
+                });
+            }
+            
+            updateTurnIndicator() {
+                if (this.gameOver) return;
+                
+                this.turnIndicator.textContent = this.currentPlayer === 1 ? "Your Turn" : "AI's Turn";
+                
+                // Update glow effect only for human player
+                this.pits.forEach(pit => {
+                    pit.classList.remove('glow-effect');
+                    if (this.currentPlayer === 1 && parseInt(pit.dataset.player) === 1 && this.board[parseInt(pit.dataset.pit)] > 0) {
+                        pit.classList.add('glow-effect');
+                    }
+                });
+            }
+            
+            updateScores() {
+                this.player1Score.textContent = this.board[6];
+                this.player2Score.textContent = this.board[13];
+            }
+            
+            updatePitAvailability() {
+                this.pits.forEach(pit => {
+                    const pitIndex = parseInt(pit.dataset.pit);
+                    const pitPlayer = parseInt(pit.dataset.player);
+                    
+                    // Only enable human player's pits during their turn
+                    if (this.gameOver || this.currentPlayer === 2 || pitPlayer !== 1 || this.board[pitIndex] === 0) {
+                        pit.classList.add('disabled');
+                    } else {
+                        pit.classList.remove('disabled');
+                    }
+                });
+            }
+            
+            makeAIMove() {
+                // Add delay for better UX
+                setTimeout(() => {
+                    if (this.gameOver) return;
+                    
+                    const aiPitIndex = this.selectAIMove();
+                    if (aiPitIndex !== -1) {
+                        // Add visual feedback for AI move
+                        const aiPit = document.querySelector(`[data-pit="${aiPitIndex}"]`);
+                        aiPit.classList.add('bounce-animation');
+                        
+                        setTimeout(() => {
+                            aiPit.classList.remove('bounce-animation');
+                            this.makeMove(aiPitIndex);
+                        }, 300);
+                    }
+                }, 1000); // 1 second delay
+            }
+            
+            selectAIMove() {
+                // Get available AI pits (7-12)
+                const aiPits = [];
+                for (let i = 7; i <= 12; i++) {
+                    if (this.board[i] > 0) {
+                        aiPits.push(i);
+                    }
+                }
+                
+                if (aiPits.length === 0) return -1;
+                
+                // AI Strategy: Priority order
+                // 1. Move that lands in AI store for extra turn
+                // 2. Move with most stones (aggressive)
+                // 3. Random fallback
+                
+                // Check for extra turn opportunities
+                for (let pit of aiPits) {
+                    if (this.simulateMove(pit) === 13) { // Lands in AI store
+                        return pit;
+                    }
+                }
+                
+                // Choose pit with most stones (aggressive play)
+                let bestPit = aiPits[0];
+                let maxStones = this.board[bestPit];
+                
+                for (let pit of aiPits) {
+                    if (this.board[pit] > maxStones) {
+                        maxStones = this.board[pit];
+                        bestPit = pit;
+                    }
+                }
+                
+                return bestPit;
+            }
+            
+            simulateMove(pitIndex) {
+                // Simulate where the last stone will land
+                let stones = this.board[pitIndex];
+                let currentIndex = pitIndex;
+                
+                while (stones > 0) {
+                    currentIndex = (currentIndex + 1) % 14;
+                    
+                    // Skip human player's store (index 6)
+                    if (currentIndex === 6) {
+                        continue;
+                    }
+                    
+                    stones--;
+                }
+                
+                return currentIndex;
+            }
+            
+            // Capture checking removed
+            
+            showToast(message, duration = 2000) {
+                this.toastMessage.textContent = message;
+                this.toast.classList.add('show');
+                
+                setTimeout(() => {
+                    this.toast.classList.remove('show');
+                }, duration);
+            }
+            
+            showPlayerMessage(message, player, duration = 2000) {
+                // 기존 메시지 제거
+                const existingMessage = document.querySelector('.player-message');
+                if (existingMessage) {
+                    existingMessage.remove();
+                }
+                
+                // 새 메시지 생성
+                const messageElement = document.createElement('div');
+                messageElement.className = `player-message player${player}`;
+                messageElement.textContent = message;
+                
+                document.body.appendChild(messageElement);
+                
+                // 애니메이션 표시
+                setTimeout(() => {
+                    messageElement.classList.add('show');
+                }, 10);
+                
+                // 자동 제거
+                setTimeout(() => {
+                    messageElement.classList.remove('show');
+                    setTimeout(() => {
+                        if (document.body.contains(messageElement)) {
+                            document.body.removeChild(messageElement);
+                        }
+                    }, 300);
+                }, duration);
+            }
+            
+            showGameOverPopup(message, player1Score, player2Score) {
+                this.popupTitle.textContent = message;
+                this.popupScore.textContent = `Your Score: ${player1Score} - AI Score: ${player2Score}`;
+                this.gameOverPopup.classList.add('show');
+            }
+            
+            hideGameOverPopup() {
+                this.gameOverPopup.classList.remove('show');
+            }
+            
+            shareGame() {
+                const player1Score = this.board[6];
+                const player2Score = this.board[13];
+                const result = player1Score > player2Score ? "승리" : 
+                             player2Score > player1Score ? "패배" : "무승부";
+                
+                const text = `만칼라 게임 결과: ${result}! 내 점수: ${player1Score}, AI 점수: ${player2Score} 🎮`;
+                
+                if (navigator.share) {
+                    navigator.share({
+                        title: '만칼라 게임 결과',
+                        text: text,
+                        url: window.location.href
+                    });
+                } else {
+                    // Fallback - copy to clipboard
+                    navigator.clipboard.writeText(text + ' ' + window.location.href).then(() => {
+                        this.showToast("결과가 복사되었습니다! 📋");
+                    });
+                }
+            }
+            
+            restartGame() {
+                this.board = [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0];
+                this.currentPlayer = 1;
+                this.gameOver = false;
+                
+                // 오토플레이가 켜져있으면 그대로 유지
+                
+                this.hideGameOverPopup();
+                this.initializeGame();
+                this.showToast("New game started! 🎮");
+                
+                // 오토플레이가 켜져있다면 바로 시작
+                if (this.autoPlay) {
+                    this.startAutoPlay();
+                }
+            }
+        }
+        
+        // Initialize game when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new MancalaGame();
+        });
+    </script>
+</body>
+</html>
